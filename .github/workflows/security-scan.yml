@@ -10,6 +10,8 @@ on:
 jobs:
   trivy-scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # This is important for GitHub Pages
     
     steps:
       - name: Checkout code
@@ -37,20 +39,19 @@ jobs:
           # Run the scan and save results
           trivy image --format json --output trivy-results.json test-image:latest
       
-      - name: Show scan results summary
-        run: |
-          echo "Scan completed. Results saved to trivy-results.json"
-          ls -la
-          
-      - name: Create GitHub Pages directory
+      - name: Create public directory
         run: |
           mkdir -p public
           cp trivy-results.json public/
-          echo "<html><body><h1>Trivy Scan Results</h1><p><a href='trivy-results.json'>Download JSON Report</a></p></body></html>" > public/index.html
-      
+          echo "<html><body><h1>Vulnerability Report</h1><p><a href='trivy-results.json'>View JSON Report</a></p></body></html>" > public/index.html
+
+      # Direct GitHub Pages deployment using GitHub API
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          force_orphan: true
+        run: |
+          cd public
+          git init
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Update vulnerability scan results"
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:gh-pages
