@@ -10,39 +10,30 @@ on:
 jobs:
   trivy-scan:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Build Docker image
         run: docker build -t test-image:latest .
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'test-image:latest'
-          format: 'json'
-          output: 'trivy-results.json'
-
-      - name: Upload results as artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: trivy-results
-          path: trivy-results.json
-          retention-days: 5
-
-      # Create and deploy a simple web page with the results
-      - name: Prepare GitHub Pages
+        run: |
+          # Install Trivy directly
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.35.0
+          
+          # Run the scan and save results
+          trivy image --format json --output trivy-results.json test-image:latest
+      
+      - name: Create GitHub Pages directory
         run: |
           mkdir -p public
           cp trivy-results.json public/
-          echo "<html><body><h1>Vulnerability Scan Results</h1><p>Access the JSON at <a href='trivy-results.json'>trivy-results.json</a></p></body></html>" > public/index.html
-
+          echo "<html><body><h1>Trivy Scan Results</h1><p><a href='trivy-results.json'>Download JSON Report</a></p></body></html>" > public/index.html
+      
       - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@4.1.4
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          branch: gh-pages
-          folder: public
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
