@@ -5,40 +5,44 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  schedule:
-    - cron: '0 0 * * 0'  # Weekly scan on Sundays
+  workflow_dispatch:
 
 jobs:
   trivy-scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Build Docker image
-        run: docker build -t test-image:${{ github.sha }} .
+        run: docker build -t test-image:latest .
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'test-image:${{ github.sha }}'
+          image-ref: 'test-image:latest'
           format: 'json'
           output: 'trivy-results.json'
 
-      - name: Upload scan results
-        uses: actions/upload-artifact@v3
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@v2
         with:
           name: trivy-results
           path: trivy-results.json
-          
-      - name: Deploy scan results to accessible endpoint
+          retention-days: 5
+
+      # Create and deploy a simple web page with the results
+      - name: Prepare GitHub Pages
         run: |
           mkdir -p public
           cp trivy-results.json public/
-          echo "Scan results available at: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/trivy-results.json"
-          
+          echo "<html><body><h1>Vulnerability Scan Results</h1><p>Access the JSON at <a href='trivy-results.json'>trivy-results.json</a></p></body></html>" > public/index.html
+
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: JamesIves/github-pages-deploy-action@4.1.4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
+          branch: gh-pages
+          folder: public
